@@ -87,10 +87,6 @@ class HungarianMatcher(nn.Module):
             + self.cost_class * cost_class
             + self.cost_giou * cost_giou
         )
-        # print("matcher", bs, num_queries, C.size())
-        if tgt_bbox.size(0) == 0:
-            print("target bbox_size)", tgt_bbox.size())
-            print("num_queries ", num_queries)
         C = C.view(bs, num_queries, -1).cpu()
 
         sizes = [len(v["boxes"]) for v in targets]

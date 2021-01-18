@@ -40,15 +40,12 @@ class RectangleQueryEncoding(nn.Module):
         e = "boxes"
         ml = max([len(b[e]) for b in batch])
         if ml == 0:
-            print("ASSERT TRIGGERD")
             ml = 1  # assert ML > 0
         for b in batch:
             feat = torch.cat([b[e], b[e].new_zeros(ml - b[e].size(0), b[e].size(1))], 0)
             # here we actually forward the stuff
             feat = self.rectangle_encoder(feat)
             b["boxfeat"] = feat
-            if ml == 1:
-                print(feat.size())
         out = torch.stack([b["boxfeat"] for b in batch], 1)
 
         return out
@@ -72,6 +69,8 @@ class CentreQueryEncoding(nn.Module):
         # get max len of  the elements in a batch
         e = "boxes"
         ml = max([len(b[e]) for b in batch])
+        if ml == 0:
+            ml = 1  # assert ML > 0
         for b in batch:
             b["center"] = CentreQueryEncoding._get_midpoint(b[e])
             feat = torch.cat(
@@ -100,6 +99,8 @@ class CentreAreaQueryEncoding(nn.Module):
     def forward(self, batch):
         # get max len of  the elements in a batch
         ml = max([len(b["boxes"]) for b in batch])
+        if ml == 0:
+            ml = 1  # assert ML > 0
         for b in batch:
             b["centers"] = CentreQueryEncoding._get_midpoint(b["boxes"])
             b["area_feat"] = b["area"].unsqueeze(1)
