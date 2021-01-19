@@ -59,11 +59,14 @@ class Transformer(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, src, mask, query_embed, pos_embed):
+    def forward(self, src, mask, query_embed, pos_embed: Optional[Tensor] = None):
         # flatten NxCxHxW to HWxNxC
         bs, c, h, w = src.shape
         src = src.flatten(2).permute(2, 0, 1)
-        pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
+        # Bruno's modification: if there is nothing here, position has been added previously
+        # to the source and it's highly questionable what the fuck will happen later on (yey)
+        if pos_embed is not None:
+            pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
         # bruno's modification for playing with querry embeddings
         if len(query_embed.size()) == 2:
             query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)

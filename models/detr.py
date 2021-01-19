@@ -19,6 +19,7 @@ from util.misc import (
 from .backbone import build_backbone
 from .matcher import build_matcher
 from .query_encoding import build_query_encoding
+from .pool_module import build_pooling_module
 from .segmentation import (
     DETRsegm,
     PostProcessPanoptic,
@@ -37,6 +38,7 @@ class DETR(nn.Module):
         backbone,
         transformer,
         query_encoder,
+        pool_module,
         num_classes,
         num_queries,
         aux_loss=False,
@@ -58,6 +60,7 @@ class DETR(nn.Module):
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         # self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.query_embed = query_encoder
+        self.pool_module = pool_module
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
         self.aux_loss = aux_loss
@@ -82,11 +85,13 @@ class DETR(nn.Module):
         features, pos = self.backbone(samples, targets)
 
         src, mask = features[-1].decompose()
+        src = self.input_proj(src)
         assert mask is not None
-        hs = self.transformer(
-            self.input_proj(src), mask, self.query_embed(targets), pos[-1]
-        )[0]
 
+        # TODO: forward pool module here
+        src, mask, pos = self.pool_module((src, mask, pos[-1]))
+
+        hs = self.transformer(src, mask, self.query_embed(targets), pos)[0]
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
         out = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord[-1]}
@@ -382,10 +387,13 @@ def build(args):
 
     query_encoder = build_query_encoding(args)
 
+    pool_module = build_pooling_module(args)
+
     model = DETR(
         backbone,
         transformer,
         query_encoder,
+        pool_module,
         num_classes=num_classes,
         num_queries=args.num_queries,
         aux_loss=args.aux_loss,
