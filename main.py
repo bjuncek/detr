@@ -52,7 +52,7 @@ def get_args_parser():
         "--position_embedding",
         default="sine",
         type=str,
-        choices=("sine", "learned"),
+        choices=("sine", "learned", "GT"),
         help="Type of positional embedding to use on top of the image features",
     )
 
