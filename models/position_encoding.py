@@ -5,8 +5,28 @@ Various positional encodings for the transformer.
 import math
 import torch
 from torch import nn
+import torch.nn.functional as F
 
+
+# from .position_encoding import MLP
 from util.misc import NestedTensor
+
+
+class MLP(nn.Module):
+    """ Very simple multi-layer perceptron (also called FFN)"""
+
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
+        super().__init__()
+        self.num_layers = num_layers
+        h = [hidden_dim] * (num_layers - 1)
+        self.layers = nn.ModuleList(
+            nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim])
+        )
+
+    def forward(self, x):
+        for i, layer in enumerate(self.layers):
+            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+        return x
 
 
 class PositionEmbeddingSine(nn.Module):
@@ -28,7 +48,7 @@ class PositionEmbeddingSine(nn.Module):
             scale = 2 * math.pi
         self.scale = scale
 
-    def forward(self, tensor_list: NestedTensor):
+    def forward(self, tensor_list: NestedTensor, targets):
         x = tensor_list.tensors
         mask = tensor_list.mask
         assert mask is not None
@@ -52,6 +72,7 @@ class PositionEmbeddingSine(nn.Module):
             (pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()), dim=4
         ).flatten(3)
         pos = torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)
+        print("Positional embedding size ", pos.size())
         return pos
 
 
@@ -70,7 +91,7 @@ class PositionEmbeddingLearned(nn.Module):
         nn.init.uniform_(self.row_embed.weight)
         nn.init.uniform_(self.col_embed.weight)
 
-    def forward(self, tensor_list: NestedTensor):
+    def forward(self, tensor_list: NestedTensor, targets):
         x = tensor_list.tensors
         h, w = x.shape[-2:]
         i = torch.arange(w, device=x.device)
@@ -89,35 +110,34 @@ class PositionEmbeddingLearned(nn.Module):
             .unsqueeze(0)
             .repeat(x.shape[0], 1, 1, 1)
         )
+        print("Positional embedding size ", pos.size())
         return pos
 
 
-# class PositionEmbeddingGTMLP(nn.Module):
-#     """
-#     Absolute pos embedding, learned.
-#     """
-#     def __init__(self, num_pos_feats=256):
-#         super().__init__()
-#         self.row_embed = nn.Embedding(50, num_pos_feats)
-#         self.col_embed = nn.Embedding(50, num_pos_feats)
-#         self.reset_parameters()
+class PositionEmbeddingGTMLP(nn.Module):
+    """
+    Absolute pos embedding, learned.
+    """
 
-#     def reset_parameters(self):
-#         nn.init.uniform_(self.row_embed.weight)
-#         nn.init.uniform_(self.col_embed.weight)
+    def __init__(self, pos_feats_dim=256, max_num_positions=50, mode="bbox"):
+        super().__init__()
+        self.mlp = MLP(4 * max_num_positions, pos_feats_dim, pos_feats_dim, 1)
+        self.max_len = max_num_positions
 
-#     def forward(self, tensor_list: NestedTensor):
-#         x = tensor_list.tensors
-#         h, w = x.shape[-2:]
-#         i = torch.arange(w, device=x.device)
-#         j = torch.arange(h, device=x.device)
-#         x_emb = self.col_embed(i)
-#         y_emb = self.row_embed(j)
-#         pos = torch.cat([
-#             x_emb.unsqueeze(0).repeat(h, 1, 1),
-#             y_emb.unsqueeze(1).repeat(1, w, 1),
-#         ], dim=-1).permute(2, 0, 1).unsqueeze(0).repeat(x.shape[0], 1, 1, 1)
-#         return pos
+    def forward(self, tensor_list: NestedTensor, targets):
+        e = "boxes"
+        for b in targets:
+            # here we actually forward the stuff
+            print(b[e].size())
+            feat = torch.cat(
+                [b[e], b[e].new_zeros(self.max_len - b[e].size(0), b[e].size(1))], 0
+            )
+            b["boxfeat"] = self.mlp(feat.flatten())
+        pos = (
+            torch.stack([b["boxfeat"] for b in targets], 0).unsqueeze(-1).unsqueeze(-1)
+        )
+        print("Positional embedding size ", pos.size())
+        return pos
 
 
 def build_position_encoding(args):
@@ -127,6 +147,8 @@ def build_position_encoding(args):
         position_embedding = PositionEmbeddingSine(N_steps, normalize=True)
     elif args.position_embedding in ("v3", "learned"):
         position_embedding = PositionEmbeddingLearned(N_steps)
+    elif args.position_embedding in ("GT"):
+        position_embedding = PositionEmbeddingGTMLP()
     else:
         raise ValueError(f"not supported {args.position_embedding}")
 
