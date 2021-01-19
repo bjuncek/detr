@@ -27,8 +27,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         img, target = self.prepare(img, target)
         if self._transforms is not None:
             img, target = self._transforms(img, target)
-        if target["boxes"].size(0) == 0:
-            print("DS", target["boxes"], "fucked")
+
         return img, target
 
 
