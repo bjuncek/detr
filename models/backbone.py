@@ -136,7 +136,6 @@ class Joiner(nn.Sequential):
             # position encoding
             pos.append(self[1](x, targets).to(x.tensors.dtype))
 
-        print("Sizes in the joiner", len(out), len(pos), pos[0].size())
         return out, pos
 
 
