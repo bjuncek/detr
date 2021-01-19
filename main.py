@@ -55,6 +55,13 @@ def get_args_parser():
         choices=("sine", "learned", "GT"),
         help="Type of positional embedding to use on top of the image features",
     )
+    parser.add_argument(
+        "--pooling_method",
+        default="none",
+        type=str,
+        choices=("none", "avgpool", "transformer_pool"),
+        help="Type of pooling to apply to the featuremap",
+    )
 
     # * Transformer
     parser.add_argument(
