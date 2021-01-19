@@ -72,7 +72,6 @@ class PositionEmbeddingSine(nn.Module):
             (pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()), dim=4
         ).flatten(3)
         pos = torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)
-        print("Positional embedding size ", pos.size())
         return pos
 
 
@@ -110,7 +109,6 @@ class PositionEmbeddingLearned(nn.Module):
             .unsqueeze(0)
             .repeat(x.shape[0], 1, 1, 1)
         )
-        print("Positional embedding size ", pos.size())
         return pos
 
 
@@ -128,7 +126,6 @@ class PositionEmbeddingGTMLP(nn.Module):
         e = "boxes"
         for b in targets:
             # here we actually forward the stuff
-            print(b[e].size())
             feat = torch.cat(
                 [b[e], b[e].new_zeros(self.max_len - b[e].size(0), b[e].size(1))], 0
             )
@@ -136,7 +133,6 @@ class PositionEmbeddingGTMLP(nn.Module):
         pos = (
             torch.stack([b["boxfeat"] for b in targets], 0).unsqueeze(-1).unsqueeze(-1)
         )
-        print("Positional embedding size ", pos.size())
         return pos
 
 
