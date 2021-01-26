@@ -281,7 +281,23 @@ def main(args):
             )
         else:
             checkpoint = torch.load(args.resume, map_location="cpu")
-        model_without_ddp.load_state_dict(checkpoint["model"])
+
+        # NOTE: this is Bruno's hack to load stuff in
+        model_dict = model_without_ddp.state_dict()
+        pretrained_dict = checkpoint["model"]
+        # hack for adding query stuff
+        pretrained_dict["query_embed.query_embed.weight"] = pretrained_dict[
+            "query_embed.weight"
+        ]
+        # 1. filter out unnecessary keys
+        pretrained_dict = {
+            k: v for k, v in pretrained_dict.items() if k in model_dict
+        }
+        # 2. overwrite entries in the existing state dict
+        model_dict.update(pretrained_dict)
+        # 3. load new state dict
+        model_without_ddp.load_state_dict(model_dict)
+
         if (
             not args.eval
             and "optimizer" in checkpoint
