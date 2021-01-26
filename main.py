@@ -286,13 +286,12 @@ def main(args):
         model_dict = model_without_ddp.state_dict()
         pretrained_dict = checkpoint["model"]
         # hack for adding query stuff
-        pretrained_dict["query_embed.query_embed.weight"] = pretrained_dict[
-            "query_embed.weight"
-        ]
+        if "query_embed.query_embed.weight" in model_dict.keys():
+            pretrained_dict["query_embed.query_embed.weight"] = pretrained_dict[
+                "query_embed.weight"
+            ]
         # 1. filter out unnecessary keys
-        pretrained_dict = {
-            k: v for k, v in pretrained_dict.items() if k in model_dict
-        }
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
         # 2. overwrite entries in the existing state dict
         model_dict.update(pretrained_dict)
         # 3. load new state dict
