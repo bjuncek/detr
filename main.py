@@ -59,7 +59,7 @@ def get_args_parser():
         "--pooling_method",
         default="none",
         type=str,
-        choices=("none", "avgpool", "transformer_pool"),
+        choices=("none", "avgpool", "transformer_pool", "avghack"),
         help="Type of pooling to apply to the featuremap",
     )
 
@@ -290,9 +290,7 @@ def main(args):
             "query_embed.weight"
         ]
         # 1. filter out unnecessary keys
-        pretrained_dict = {
-            k: v for k, v in pretrained_dict.items() if k in model_dict
-        }
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
         # 2. overwrite entries in the existing state dict
         model_dict.update(pretrained_dict)
         # 3. load new state dict
