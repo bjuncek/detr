@@ -27,11 +27,18 @@ class Transformer(nn.Module):
         activation="relu",
         normalize_before=False,
         return_intermediate_dec=False,
+        pool_in_sum=False,
     ):
         super().__init__()
 
         encoder_layer = TransformerEncoderLayer(
-            d_model, nhead, dim_feedforward, dropout, activation, normalize_before
+            d_model,
+            nhead,
+            dim_feedforward,
+            dropout,
+            activation,
+            normalize_before,
+            pool_in_sum,
         )
         encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
         self.encoder = TransformerEncoder(
@@ -53,6 +60,7 @@ class Transformer(nn.Module):
 
         self.d_model = d_model
         self.nhead = nhead
+        self.pool = pool_in_sum
 
     def _reset_parameters(self):
         for p in self.parameters():
@@ -81,6 +89,8 @@ class Transformer(nn.Module):
             pos=pos_embed,
             query_pos=query_embed,
         )
+        if self.pool:
+            h = w = 1
         return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
 
 
@@ -172,6 +182,7 @@ class TransformerEncoderLayer(nn.Module):
         dropout=0.1,
         activation="relu",
         normalize_before=False,
+        pool_in_sum=False,
     ):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -187,9 +198,13 @@ class TransformerEncoderLayer(nn.Module):
 
         self.activation = _get_activation_fn(activation)
         self.normalize_before = normalize_before
+        self.pool = pool_in_sum
 
     def with_pos_embed(self, tensor, pos: Optional[Tensor]):
-        return tensor if pos is None else tensor + pos
+        ret = tensor if pos is None else tensor + pos
+        if self.pool:
+            return torch.mean(ret, dim=0, keepdim=True)
+        return ret
 
     def forward_post(
         self,
@@ -199,6 +214,11 @@ class TransformerEncoderLayer(nn.Module):
         pos: Optional[Tensor] = None,
     ):
         q = k = self.with_pos_embed(src, pos)
+        if self.pool:
+            src = torch.mean(src, dim=0, keepdim=True)
+            src_key_padding_mask = (
+                torch.zeros((src.size(1), 1)).to(torch.bool).to(src.device)
+            )
         src2 = self.self_attn(
             q, k, value=src, attn_mask=src_mask, key_padding_mask=src_key_padding_mask
         )[0]
@@ -218,6 +238,12 @@ class TransformerEncoderLayer(nn.Module):
     ):
         src2 = self.norm1(src)
         q = k = self.with_pos_embed(src2, pos)
+        if self.pool:
+            src = torch.mean(src, dim=0, keepdim=True)
+            src2 = torch.mean(src2, dim=0, keepdim=True)
+            src_key_padding_mask = (
+                torch.zeros((src.size(1), 1)).to(torch.bool).to(src.device)
+            )
         src2 = self.self_attn(
             q, k, value=src2, attn_mask=src_mask, key_padding_mask=src_key_padding_mask
         )[0]
@@ -268,7 +294,8 @@ class TransformerDecoderLayer(nn.Module):
         self.normalize_before = normalize_before
 
     def with_pos_embed(self, tensor, pos: Optional[Tensor]):
-        return tensor if pos is None else tensor + pos
+        ret = tensor if pos is None else tensor + pos
+        return ret
 
     def forward_post(
         self,
@@ -287,6 +314,12 @@ class TransformerDecoderLayer(nn.Module):
         )[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
+        # this is a dumb hack, but fuck it
+        if memory.size() != pos.size():
+            pos = torch.mean(pos, dim=0, keepdim=True)
+            memory_key_padding_mask = (
+                torch.zeros((memory.size(1), 1)).to(torch.bool).to(memory.device)
+            )
         tgt2 = self.multihead_attn(
             query=self.with_pos_embed(tgt, query_pos),
             key=self.with_pos_embed(memory, pos),
@@ -371,6 +404,7 @@ def _get_clones(module, N):
 
 
 def build_transformer(args):
+    pool = True if args.pooling_method in ["avghack"] else False
     return Transformer(
         d_model=args.hidden_dim,
         dropout=args.dropout,
@@ -380,6 +414,7 @@ def build_transformer(args):
         num_decoder_layers=args.dec_layers,
         normalize_before=args.pre_norm,
         return_intermediate_dec=True,
+        pool_in_sum=pool,
     )
 
 
