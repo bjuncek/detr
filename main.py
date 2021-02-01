@@ -170,6 +170,13 @@ def get_args_parser():
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--resume", default="", help="resume from checkpoint")
     parser.add_argument(
+        "--load_model_only",
+        dest="load_model_only",
+        action="store_true",
+        default=False,
+        help="Avoid loading the optimizer dict paths",
+    )
+    parser.add_argument(
         "--start_epoch", default=0, type=int, metavar="N", help="start epoch"
     )
     parser.add_argument("--eval", action="store_true")
@@ -299,6 +306,7 @@ def main(args):
 
         if (
             not args.eval
+            and not args.load_model_only
             and "optimizer" in checkpoint
             and "lr_scheduler" in checkpoint
             and "epoch" in checkpoint
