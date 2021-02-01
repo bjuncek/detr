@@ -28,6 +28,7 @@ class Transformer(nn.Module):
         normalize_before=False,
         return_intermediate_dec=False,
         pool_in_sum=False,
+        aggregate_t=False,
     ):
         super().__init__()
 
@@ -56,6 +57,12 @@ class Transformer(nn.Module):
             return_intermediate=return_intermediate_dec,
         )
 
+        self.aggregate_t = aggregate_t
+        if self.aggregate_t:
+            # aggregation embedding is learned
+            self.agg_emb = nn.Parameter(torch.rand(1, d_model))
+            self.agg_pos = nn.Parameter(torch.rand(1, d_model))
+
         self._reset_parameters()
 
         self.d_model = d_model
@@ -78,10 +85,30 @@ class Transformer(nn.Module):
         # bruno's modification for playing with querry embeddings
         if len(query_embed.size()) == 2:
             query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
+
         mask = mask.flatten(1)
+
+        # if we're aggregating the model in the encoder
+        # we need to add an additional parammetes that we're going to aggregate
+        # over
+        if self.aggregate_t:
+            src = torch.cat([self.agg_emb.unsqueeze(0).repeat(1, bs, 1), src], dim=0)
+            pos_embed = torch.cat(
+                [self.agg_pos.unsqueeze(0).repeat(1, bs, 1), pos_embed], dim=0
+            )
+            mask_append = torch.zeros((bs, 1)).to(torch.bool).to(mask.device)
+            mask = torch.cat([mask_append, mask], dim=1)
 
         tgt = torch.zeros_like(query_embed)
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+
+        # if we are aggregating the model in the encoder we need to select
+        # just the outputs corresponding to the first element (self.agg_emb)
+        if self.aggregate_t:
+            memory = memory[0, ...].unsqueeze(0)
+            pos_embed = pos_embed[0, ...].unsqueeze(0)
+            mask = mask[..., 0].unsqueeze(1)
+
         hs = self.decoder(
             tgt,
             memory,
@@ -89,8 +116,10 @@ class Transformer(nn.Module):
             pos=pos_embed,
             query_pos=query_embed,
         )
-        if self.pool:
+
+        if self.pool or self.aggregate_t:
             h = w = 1
+
         return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
 
 
@@ -405,6 +434,10 @@ def _get_clones(module, N):
 
 def build_transformer(args):
     pool = True if args.pooling_method in ["avghack"] else False
+    aggregate = True if args.pooling_method in ["transformer_pool"] else False
+
+    assert (pool & aggregate) != True
+
     return Transformer(
         d_model=args.hidden_dim,
         dropout=args.dropout,
@@ -415,6 +448,7 @@ def build_transformer(args):
         normalize_before=args.pre_norm,
         return_intermediate_dec=True,
         pool_in_sum=pool,
+        aggregate_t=aggregate,
     )
 
 
