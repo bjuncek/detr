@@ -20,7 +20,7 @@ class AvgPoolModule(nn.Module):
 
 
 def build_pooling_module(args):
-    if args.pooling_method in ["none", "avghack", ""]:
+    if args.pooling_method in ["none", "avghack", "transformer_pool", ""]:
         return nn.Identity()
     elif args.pooling_method in ["avgpool", "avg"]:
         return AvgPoolModule()
