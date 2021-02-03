@@ -29,6 +29,7 @@ class Transformer(nn.Module):
         return_intermediate_dec=False,
         pool_in_sum=False,
         aggregate_t=False,
+        pool_encoded_values=False,
     ):
         super().__init__()
 
@@ -62,6 +63,8 @@ class Transformer(nn.Module):
             # aggregation embedding is learned
             self.agg_emb = nn.Parameter(torch.rand(1, d_model))
             self.agg_pos = nn.Parameter(torch.rand(1, d_model))
+
+        self.pool_encoder = pool_encoded_values
 
         self._reset_parameters()
 
@@ -109,6 +112,14 @@ class Transformer(nn.Module):
             pos_embed = pos_embed[0, ...].unsqueeze(0)
             mask = mask[..., 0].unsqueeze(1)
 
+        # if we are simply pooling the model here
+        if self.pool_encoder:
+            memory = torch.mean(memory, dim=0, keepdim=True)
+            # this is a hack, how to deal with this better
+            pos_embed = torch.mean(memory, dim=0, keepdim=True)
+            # and we're in always non-padded mode
+            mask = torch.zeros((bs, 1)).to(torch.bool).to(mask.device)
+
         hs = self.decoder(
             tgt,
             memory,
@@ -117,7 +128,7 @@ class Transformer(nn.Module):
             query_pos=query_embed,
         )
 
-        if self.pool or self.aggregate_t:
+        if self.pool or self.aggregate_t or self.pool_encoder:
             h = w = 1
 
         return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
@@ -435,8 +446,9 @@ def _get_clones(module, N):
 def build_transformer(args):
     pool = True if args.pooling_method in ["avghack"] else False
     aggregate = True if args.pooling_method in ["transformer_pool"] else False
+    encoder_pool = True if args.pooling_method in ["encoder_pool"] else False
 
-    assert (pool & aggregate) != True
+    assert (pool & aggregate & encoder_pool) != True
 
     return Transformer(
         d_model=args.hidden_dim,
@@ -449,6 +461,7 @@ def build_transformer(args):
         return_intermediate_dec=True,
         pool_in_sum=pool,
         aggregate_t=aggregate,
+        pool_encoded_values=encoder_pool,
     )
 
 

@@ -59,7 +59,7 @@ def get_args_parser():
         "--pooling_method",
         default="none",
         type=str,
-        choices=("none", "avgpool", "transformer_pool", "avghack"),
+        choices=("none", "avgpool", "transformer_pool", "avghack", "encoder_pool"),
         help="Type of pooling to apply to the featuremap",
     )
 
