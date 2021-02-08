@@ -62,6 +62,12 @@ def get_args_parser():
         choices=("none", "avgpool", "transformer_pool", "avghack", "encoder_pool"),
         help="Type of pooling to apply to the featuremap",
     )
+    parser.add_argument(
+        "--pooling_dim",
+        default=0,
+        type=int,
+        help="Type of pooling to apply to the featuremap",
+    )
 
     # * Transformer
     parser.add_argument(
