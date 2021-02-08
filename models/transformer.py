@@ -30,6 +30,7 @@ class Transformer(nn.Module):
         pool_in_sum=False,
         aggregate_t=False,
         pool_encoded_values=False,
+        encoder_pool_sdim=-1,
     ):
         super().__init__()
 
@@ -58,13 +59,25 @@ class Transformer(nn.Module):
             return_intermediate=return_intermediate_dec,
         )
 
+        # here we add token parameter to use transformer to aggregate values into
         self.aggregate_t = aggregate_t
         if self.aggregate_t:
             # aggregation embedding is learned
             self.agg_emb = nn.Parameter(torch.rand(1, d_model))
             self.agg_pos = nn.Parameter(torch.rand(1, d_model))
 
+        # this avg pools the values after encoder
         self.pool_encoder = pool_encoded_values
+
+        self.encoder_pool_sdim = encoder_pool_sdim
+        if self.encoder_pool_sdim == 1:
+            self.pool_encoder = True
+        elif self.encoder_pool_sdim > 1:
+            self.encpool = nn.AdaptiveAvgPool2d(
+                (self.encoder_pool_sdim, self.encoder_pool_sdim)
+            )
+            self.pool_conv = nn.Conv2d(d_model, d_model, 1)
+            self.pool_pos = nn.Conv2d(d_model, d_model, 1)
 
         self._reset_parameters()
 
@@ -119,6 +132,19 @@ class Transformer(nn.Module):
             pos_embed = torch.mean(memory, dim=0, keepdim=True)
             # and we're in always non-padded mode
             mask = torch.zeros((bs, 1)).to(torch.bool).to(mask.device)
+
+        if self.encoder_pool_sdim > 1:
+            pdim = self.encoder_pool_sdim * self.encoder_pool_sdim
+            memory = memory.permute(1, 2, 0).view(bs, c, h, w)
+            memory = self.pool_conv(self.encpool(memory))
+            memory = memory.view(bs, c, pdim).permute(2, 0, 1)
+            pos_embed = pos_embed.permute(1, 2, 0).view(bs, c, h, w)
+            pos_embed = self.pool_pos(self.encpool(pos_embed))
+            pos_embed = pos_embed.view(bs, c, pdim).permute(2, 0, 1)
+
+            # and we're in always non-padded mode
+            mask = torch.zeros((bs, pdim)).to(torch.bool).to(mask.device)
+            h = w = self.encoder_pool_sdim
 
         hs = self.decoder(
             tgt,
@@ -447,8 +473,8 @@ def build_transformer(args):
     pool = True if args.pooling_method in ["avghack"] else False
     aggregate = True if args.pooling_method in ["transformer_pool"] else False
     encoder_pool = True if args.pooling_method in ["encoder_pool"] else False
-
-    assert (pool & aggregate & encoder_pool) != True
+    encoder_dim = args.pooling_dim > 1
+    assert sum([pool, aggregate, encoder_pool, encoder_dim]) <= 1
 
     return Transformer(
         d_model=args.hidden_dim,
@@ -462,6 +488,7 @@ def build_transformer(args):
         pool_in_sum=pool,
         aggregate_t=aggregate,
         pool_encoded_values=encoder_pool,
+        encoder_pool_sdim=args.pooling_dim,
     )
 
 
