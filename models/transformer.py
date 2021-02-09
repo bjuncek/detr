@@ -136,10 +136,10 @@ class Transformer(nn.Module):
         if self.encoder_pool_sdim > 1:
             pdim = self.encoder_pool_sdim * self.encoder_pool_sdim
             memory = memory.permute(1, 2, 0).view(bs, c, h, w)
-            memory = self.pool_conv(self.encpool(memory))
+            memory = self.encpool(self.pool_conv(memory))
             memory = memory.view(bs, c, pdim).permute(2, 0, 1)
             pos_embed = pos_embed.permute(1, 2, 0).view(bs, c, h, w)
-            pos_embed = self.pool_pos(self.encpool(pos_embed))
+            pos_embed = self.encpool(self.pool_pos(pos_embed))
             pos_embed = pos_embed.view(bs, c, pdim).permute(2, 0, 1)
 
             # and we're in always non-padded mode
