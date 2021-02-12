@@ -30,10 +30,11 @@ class DefaultQueryEncoding(nn.Module):
 
 
 class RectangleQueryEncoding(nn.Module):
-    def __init__(self, num_queries, hidden_dim):
+    def __init__(self, num_queries, hidden_dim, shuffle=False):
         super().__init__()
         self.num_queries = num_queries
         self.rectangle_encoder = MLP(4, hidden_dim, hidden_dim, 1)
+        self.shuffle = shuffle
 
     def forward(self, batch):
         # get max len of  the elements in a batch
@@ -45,6 +46,9 @@ class RectangleQueryEncoding(nn.Module):
             feat = torch.cat([b[e], b[e].new_zeros(ml - b[e].size(0), b[e].size(1))], 0)
             # here we actually forward the stuff
             feat = self.rectangle_encoder(feat)
+            if self.shuffle:
+                idx = torch.randperm(feat.shape[0])
+                feat = feat[idx].view(feat.size())
             b["boxfeat"] = feat
         out = torch.stack([b["boxfeat"] for b in batch], 1)
 
@@ -136,7 +140,9 @@ def build_query_encoding(args):
     if args.query_encoding == "default":
         return DefaultQueryEncoding(args.num_queries, args.hidden_dim)
     elif args.query_encoding == "b1":
-        return RectangleQueryEncoding(args.num_queries, args.hidden_dim)
+        return RectangleQueryEncoding(
+            args.num_queries, args.hidden_dim, shuffle=args.query_shuffle
+        )
     elif args.query_encoding == "b2":
         return CentreQueryEncoding(args.num_queries, args.hidden_dim)
     elif args.query_encoding == "b3":

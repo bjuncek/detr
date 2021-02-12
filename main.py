@@ -62,6 +62,7 @@ def get_args_parser():
         choices=("none", "avgpool", "transformer_pool", "avghack", "encoder_pool"),
         help="Type of pooling to apply to the featuremap",
     )
+
     parser.add_argument(
         "--pooling_dim",
         default=0,
@@ -111,6 +112,9 @@ def get_args_parser():
         default="default",
         type=str,
         help="Default way of query encoding",
+    )
+    parser.add_argument(
+        "--query_shuffle", default=False, action="store_true",
     )
     parser.add_argument("--pre_norm", action="store_true")
 
