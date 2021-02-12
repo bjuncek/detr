@@ -29,6 +29,7 @@ def parse_args():
         "--job_dir", default="", type=str, help="Job dir. Leave empty for automatic."
     )
     parser.add_argument("--experiment_name", type=str, default="test_experiment_delete")
+    parser.add_argument("--constraint", type=str, default=None)
     return parser.parse_args()
 
 
@@ -109,6 +110,9 @@ def main():
         slurm_partition="gpu",
         timeout_min=timeout_min,  # max is 60 * 72
     )
+
+    if args.constraint:
+        executor.update_parameters(slurm_constraint=args.constraint)
 
     executor.update_parameters(name=f"detr_{args.experiment_name}")
 
