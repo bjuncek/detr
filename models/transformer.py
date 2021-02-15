@@ -70,9 +70,8 @@ class Transformer(nn.Module):
         self.pool_encoder = pool_encoded_values
 
         self.encoder_pool_sdim = encoder_pool_sdim
-        if self.encoder_pool_sdim == 1:
-            self.pool_encoder = True
-        elif self.encoder_pool_sdim > 1:
+
+        if self.encoder_pool_sdim > 0:
             self.encpool = nn.AdaptiveAvgPool2d(
                 (self.encoder_pool_sdim, self.encoder_pool_sdim)
             )
