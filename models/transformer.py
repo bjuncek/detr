@@ -380,7 +380,7 @@ class TransformerDecoderLayer(nn.Module):
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
         # this is a dumb hack, but fuck it
-        if memory.size() != pos.size():
+        if (pos is not None) and (memory.size() != pos.size()):
             pos = torch.mean(pos, dim=0, keepdim=True)
             memory_key_padding_mask = (
                 torch.zeros((memory.size(1), 1)).to(torch.bool).to(memory.device)

@@ -70,6 +70,12 @@ def get_args_parser():
         help="Type of pooling to apply to the featuremap",
     )
 
+    parser.add_argument(
+        "--pool_conv",
+        action="store_true",
+        help="If true, we replace stride with dilation in the last convolutional block (DC5)",
+    )
+
     # * Transformer
     parser.add_argument(
         "--enc_layers",
