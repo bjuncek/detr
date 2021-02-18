@@ -132,7 +132,7 @@ class Transformer(nn.Module):
             # and we're in always non-padded mode
             mask = torch.zeros((bs, 1)).to(torch.bool).to(mask.device)
 
-        if self.encoder_pool_sdim > 1:
+        if self.encoder_pool_sdim > 0:
             pdim = self.encoder_pool_sdim * self.encoder_pool_sdim
             memory = memory.permute(1, 2, 0).view(bs, c, h, w)
             memory = self.encpool(self.pool_conv(memory))
