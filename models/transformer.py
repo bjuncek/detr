@@ -13,6 +13,7 @@ from typing import Optional, List
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
+from .query_encoding import MLP
 
 
 class Transformer(nn.Module):
@@ -63,6 +64,8 @@ class Transformer(nn.Module):
         self.aggregate_t = aggregate_t
         if self.aggregate_t:
             # aggregation embedding is learned
+            self.emb_mlp = MLP(d_model, d_model, d_model, 1)
+            self.pos_mlp = MLP(d_model, d_model, d_model, 1)
             self.agg_emb = nn.Parameter(torch.rand(1, d_model))
             self.agg_pos = nn.Parameter(torch.rand(1, d_model))
 
@@ -107,9 +110,12 @@ class Transformer(nn.Module):
         # we need to add an additional parammetes that we're going to aggregate
         # over
         if self.aggregate_t:
-            src = torch.cat([self.agg_emb.unsqueeze(0).repeat(1, bs, 1), src], dim=0)
+            src = torch.cat(
+                [self.emb_mlp(self.agg_emb.unsqueeze(0).repeat(1, bs, 1)), src], dim=0
+            )
             pos_embed = torch.cat(
-                [self.agg_pos.unsqueeze(0).repeat(1, bs, 1), pos_embed], dim=0
+                [self.pos_mlp(self.agg_pos.unsqueeze(0).repeat(1, bs, 1)), pos_embed],
+                dim=0,
             )
             mask_append = torch.zeros((bs, 1)).to(torch.bool).to(mask.device)
             mask = torch.cat([mask_append, mask], dim=1)
