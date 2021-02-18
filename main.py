@@ -76,6 +76,12 @@ def get_args_parser():
         help="If true, we replace stride with dilation in the last convolutional block (DC5)",
     )
 
+    parser.add_argument(
+        "--pool_norm",
+        action="store_true",
+        help="If true, we replace stride with dilation in the last convolutional block (DC5)",
+    )
+
     # * Transformer
     parser.add_argument(
         "--enc_layers",
