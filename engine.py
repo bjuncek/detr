@@ -83,7 +83,14 @@ def train_one_epoch(
 
 @torch.no_grad()
 def evaluate(
-    model, criterion, postprocessors, data_loader, base_ds, device, output_dir
+    model,
+    criterion,
+    postprocessors,
+    data_loader,
+    base_ds,
+    device,
+    output_dir,
+    coco=True,
 ):
     model.eval()
     criterion.eval()
@@ -95,7 +102,9 @@ def evaluate(
     header = "Test:"
 
     iou_types = tuple(k for k in ("segm", "bbox") if k in postprocessors.keys())
-    coco_evaluator = CocoEvaluator(base_ds, iou_types)
+    coco_evaluator = None
+    if coco:
+        coco_evaluator = CocoEvaluator(base_ds, iou_types)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
     panoptic_evaluator = None

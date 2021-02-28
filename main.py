@@ -199,6 +199,9 @@ def get_args_parser():
         help="Avoid loading the optimizer dict paths",
     )
     parser.add_argument(
+        "--finetune", action="store_true", default=False,
+    )
+    parser.add_argument(
         "--start_epoch", default=0, type=int, metavar="N", help="start epoch"
     )
     parser.add_argument("--eval", action="store_true")
@@ -254,7 +257,7 @@ def main(args):
                 for n, p in model_without_ddp.named_parameters()
                 if "backbone" in n and p.requires_grad
             ],
-            "lr": args.lr_backbone,
+            "lr": args.lr_backbone if not args.finetune else 0,
         },
     ]
     optimizer = torch.optim.AdamW(
@@ -295,6 +298,8 @@ def main(args):
         # We also evaluate AP during panoptic training, on original coco DS
         coco_val = datasets.coco.build("val", args)
         base_ds = get_coco_api_from_dataset(coco_val)
+    elif args.dataset_file == "cmd":
+        base_ds = None
     else:
         base_ds = get_coco_api_from_dataset(dataset_val)
 
@@ -324,6 +329,13 @@ def main(args):
             ]
         # 1. filter out unnecessary keys
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        # if finetuning skip the linear stuff
+        if args.finetune:
+            pretrained_dict = {
+                k: v
+                for k, v in pretrained_dict.items()
+                if k not in ["class_embed.weight", "class_embed.bias"]
+            }
         # 2. overwrite entries in the existing state dict
         model_dict.update(pretrained_dict)
         # 3. load new state dict
@@ -349,8 +361,9 @@ def main(args):
             base_ds,
             device,
             args.output_dir,
+            coco=False if args.dataset_file == "cmd" else True,
         )
-        if args.output_dir:
+        if args.output_dir and coco_evaluator is not None:
             utils.save_on_master(
                 coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth"
             )
@@ -396,6 +409,7 @@ def main(args):
             base_ds,
             device,
             args.output_dir,
+            coco=False if args.dataset_file == "cmd" else True,
         )
 
         log_stats = {
