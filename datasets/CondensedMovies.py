@@ -204,8 +204,8 @@ def build(image_set):
     facetracks = "/scratch/shared/beegfs/maxbain/datasets/CondensedMovies/facetracks"
     annotations = "/scratch/shared/beegfs/maxbain/datasets/CondensedMovies/metadata"
     failed = [
-        "/users/korbar/phd/detr_working_copy/failed.pth",
-        "/users/korbar/phd/detr_working_copy/new_failed.pth",
+        "/users/korbar/phd/detr_working_copy/datasets/custom_data/failed.torchp",
+        "/users/korbar/phd/detr_working_copy/datasets/custom_data/new_failed.torchp",
     ]
 
     return CondensedMoviesBase(
