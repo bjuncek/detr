@@ -27,7 +27,6 @@ class_to_idx = {lACTORS[i]: i for i in range(len(lACTORS))}
 # load clips and such
 
 for split in ["train", "val"]:
-    print(split)
     clips = pd.read_csv(f"{annotation_dir}/clips.csv")
     split_data = pd.read_csv(f"{annotation_dir}/split.csv").set_index("imdbid")
     ids = split_data[split_data["split"] == split].index
@@ -45,8 +44,6 @@ for split in ["train", "val"]:
     # now go throught everything and save files to a predefined folder 
 
     for df_id in range(len(clips)):
-        if df_id % 200 == 0:
-            print(df_id)
         clip_id = clips.iloc[df_id]['videoid']
         video_year = clips.iloc[df_id]['upload_year']
         if clip_id + ".mkv" in face_dets:
@@ -77,12 +74,13 @@ for split in ["train", "val"]:
         assert len(annotations) == len(tracks) == len(feats)
 
         # then create new type of annotation
-        new_ = {"actor":[], "class":[], "class_confidence":[], "facetrack":[], "facetrack_feature":[]}
+        new_ = {"actor":[], "class":[], "class_confidence":[], "facetrack_frame":[], "facetrack_xyhw":[], "facetrack_feature":[]}
         for t in range(len(annotations)):
             new_["actor"].append(annotations[t][0])
             new_["class"].append(class_to_idx[annotations[t][0]])
             new_["class_confidence"].append(annotations[t][1])
-            new_["facetrack"].append(tracks[t])
-            new_["facetrack_feature"].append(feats[t])
+            new_["facetrack_frame"].append(tracks[t][:, 0])
+            new_["facetrack_xyhw"].append(tracks[t][:, 1:5])
+            new_["facetrack_feature"].append(feats[t])        
 
         torch.save(new_, f"/work/korbar/CMD/named_metadata/{clip_id}.th")
