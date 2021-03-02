@@ -3,7 +3,8 @@ import torch.utils.data
 import torchvision
 
 from .coco import build as build_coco
-from .CondensedMovies import build as build_cmd
+from .CondensedMovies import build_detection as build_cmd_det
+from .CondensedMovies import build_character as calvin
 
 
 def get_coco_api_from_dataset(dataset):
@@ -19,8 +20,10 @@ def get_coco_api_from_dataset(dataset):
 def build_dataset(image_set, args):
     if args.dataset_file == "coco":
         return build_coco(image_set, args)
-    if args.dataset_file == "cmd":
-        return build_cmd(image_set)
+    if args.dataset_file == "cmdd":
+        return build_cmd_det(image_set)
+    if args.dataset_file == "cmdc":
+        return calvin(image_set)
     if args.dataset_file == "coco_panoptic":
         # to avoid making panopticapi required for coco
         from .coco_panoptic import build as build_coco_panoptic
