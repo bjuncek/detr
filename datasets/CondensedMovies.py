@@ -1,19 +1,16 @@
-import os, pickle, random
+import os
+import pickle
+import random
 import pandas as pd
-import pdb
+import numpy as np
 from tqdm import tqdm
 import torch
-import decord
-from decord import VideoReader, cpu
-import torchvision.io as IO
-import torchvision.transforms.functional as F
 
-
-# for debugging purposes atm
+from datasets.CMDbase import CMDBase
 import datasets.transforms as T
 
 
-class CondensedMoviesBase(object):
+class CondensedMoviesCharacter(CMDBase):
     def __init__(
         self,
         data_dir: str,
@@ -23,26 +20,87 @@ class CondensedMoviesBase(object):
         split="train",
         failed_path=None,
     ):
-        self.data_dir = data_dir
-        self.facetrack_dir = facetrack_dir
-        self._load_clips(annotation_dir, split, failed_path)
-        self._transforms = transforms
+        super(CondensedMoviesCharacter, self).__init__(
+            data_dir, facetrack_dir, annotation_dir, transforms, split, failed_path
+        )
 
-    def _load_clips(self, annotation_dir, split, failed_path_list):
-        clips = pd.read_csv(f"{annotation_dir}/clips.csv")
-        split_data = pd.read_csv(f"{annotation_dir}/split.csv").set_index("imdbid")
-        ids = split_data[split_data["split"] == split].index
-        f = clips["imdbid"].isin(ids)
-        clips = clips[f]
-        clips = clips[clips["year"] <= 2020]
-        clips = clips.reset_index(drop=True)
-        if failed_path_list is not None:
-            for failed_path in failed_path_list:
-                failed_ids = torch.load(failed_path)[split]
-                bad_df = clips.index.isin(failed_ids)
-                clips = clips[~bad_df]
-                clips = clips.reset_index(drop=True)
-        self.clips = clips
+    def __getitem__(self, index: int):
+        # get the info from the database
+        target_clip = self.clips.iloc[index]
+        video_year = str(int(target_clip["upload_year"]))
+        video_ID = str(target_clip["videoid"])
+
+        df = torch.load(os.path.join(self.facetrack_dir, video_ID + ".th"))
+        frame_num = self._get_frame_num(df)
+        img = self._get_video_frame(video_year, video_ID, frame_num)
+        target = self._get_target(df, frame_num, img.size, index)
+
+        if self._transforms is not None:
+            img, target = self._transforms(img, target)
+        return img, target
+
+    def _get_frame_num(self, df):
+        track_idx = random.randrange(len(df["actor"]))
+        frame_num = random.choice(df["facetrack_frame"][track_idx])
+        return frame_num
+
+    def _get_target(self, df, frame_num, imgsize, idx):
+        # check if there is another track in there
+        # returning track_idx, frame_idx
+        idxs = []
+        for i in range(len(df["facetrack_frame"])):
+            frame_id = np.where(df["facetrack_frame"][i] == frame_num)[0]
+            if len(frame_id) != 0:
+                idxs.append((i, frame_id[0]))
+
+        boxes, labels, areas, iscrowd, confidence = ([], [], [], [], [])
+        # LOOP OVER THE DETECTIONS AND ADD THEM TO THE TARGET
+        for det in idxs:
+            track_id, frame_id = det
+            labels.append(df["class"][track_id])
+            xyhw = df["facetrack_xyhw"][track_id][frame_id]
+            boxes.append(xyhw)
+            areas.append(xyhw[2] * xyhw[3])
+            iscrowd.append(0)
+            confidence.append(df["class_confidence"][track_id])
+
+        w, h = imgsize
+        boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
+        boxes[:, 2:] += boxes[:, :2]
+        boxes[:, 0::2].clamp_(min=0, max=w)
+        boxes[:, 1::2].clamp_(min=0, max=h)
+
+        labels = torch.tensor(labels, dtype=torch.int64)
+        confidence = torch.tensor(confidence)
+        iscrowd = torch.tensor(iscrowd)
+        image_id = torch.tensor([frame_num])
+        clips_id = torch.tensor([idx])
+
+        return {
+            "boxes": boxes,
+            "labels": labels,
+            "iscrowd": iscrowd,
+            "orig_size": torch.as_tensor([int(h), int(w)]),
+            "size": torch.as_tensor([int(h), int(w)]),
+            "class_confidence": confidence,
+            "image_id": image_id,
+            "clips_idx": clips_id,
+        }
+
+
+class CondensedMoviesDetection(CMDBase):
+    def __init__(
+        self,
+        data_dir: str,
+        facetrack_dir: str,
+        annotation_dir: str,
+        transforms=None,
+        split="train",
+        failed_path=None,
+    ):
+        super(CondensedMoviesDetection, self).__init__(
+            data_dir, facetrack_dir, annotation_dir, transforms, split, failed_path
+        )
 
     def __getitem__(self, index: int):
         # get the info from the database
@@ -62,25 +120,6 @@ class CondensedMoviesBase(object):
             img, target = self._transforms(img, target)
 
         return img, target
-
-    def _get_video_path(self, video_year: str, video_ID: str) -> str:
-        p = os.path.join(self.data_dir, video_year, video_ID + ".mkv")
-        if not os.path.isfile(p):
-            # pdb.set_trace()
-            raise Exception(f"path to video {p} does not exist")
-        return p
-
-    def _get_video_frame(self, video_year, video_ID, frame_id):
-        p = self._get_video_path(video_year, video_ID)
-        # videos are all at 25 fps, so to get rought seconds cound we divide that
-        s_entry = (frame_id - 1) / 25
-        video, _, _ = IO.read_video(p, s_entry, s_entry + 0.5, pts_unit="sec")
-        # vr = VideoReader(p, ctx=cpu(0))
-        # if frame_id > len(vr):
-        #     frame_id = len(vr) - 1
-        # frame = vr[frame_id - 1]  # this should be a tensor
-
-        return F.to_pil_image(video[0, ...].permute(2, 0, 1))
 
     def _load_facetracks(self, video_year, video_ID):
         fd_path = os.path.join(
@@ -132,7 +171,7 @@ class CondensedMoviesBase(object):
                 [int(det[1]), int(det[2]), int(det[3]), int(det[4])]
             )  # [x1, y1, x2, y2]
             areas.append(det[3] * det[4])
-            labels.append(det[5])
+            labels.append(0)  # labels are 0 if face, 1 otherwise
             iscrowd.append(0)
             confidence.append(det[6])
 
@@ -159,12 +198,8 @@ class CondensedMoviesBase(object):
             "image_id": image_id,
         }
 
-    def __len__(self) -> int:
-        return len(self.clips)
-
 
 def make_default_transforms(image_set):
-
     normalize = T.Compose(
         [T.ToTensor(), T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]
     )
@@ -196,8 +231,7 @@ def make_default_transforms(image_set):
     raise ValueError(f"unknown {image_set}")
 
 
-def build(image_set):
-    decord.bridge.set_bridge("torch")
+def build_detection(image_set):
     data_dir = (
         "/scratch/shared/beegfs/maxbain/datasets/CondensedMovies/videos_with_border"
     )
@@ -208,7 +242,28 @@ def build(image_set):
         "/users/korbar/phd/detr_working_copy/datasets/custom_data/new_failed.torchp",
     ]
 
-    return CondensedMoviesBase(
+    return CondensedMoviesDetection(
+        data_dir,
+        facetracks,
+        annotations,
+        transforms=make_default_transforms(image_set),
+        split=image_set,
+        failed_path=failed,
+    )
+
+
+def build_character(image_set):
+    data_dir = (
+        "/scratch/shared/beegfs/maxbain/datasets/CondensedMovies/videos_with_border"
+    )
+    facetracks = "/work/korbar/CMD/named_metadata"
+    annotations = "/scratch/shared/beegfs/maxbain/datasets/CondensedMovies/metadata"
+    failed = [
+        "/users/korbar/phd/detr_working_copy/datasets/custom_data/failed.torchp",
+        "/users/korbar/phd/detr_working_copy/datasets/custom_data/new_failed.torchp",
+    ]
+
+    return CondensedMoviesCharacter(
         data_dir,
         facetracks,
         annotations,
