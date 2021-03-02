@@ -1,12 +1,12 @@
 import sys  
 import torch
 sys.path.append("/tritonhomes/korbar/phd/detr_working_copy")
-from datasets import build_cmd
+from datasets import calvin
 
 failed = {"train": []}
 ds_len = {}
 for key in failed:
-    ds = build_cmd(key)
+    ds = calvin(key)
     ds_len[key] = len(ds)
     for i in range(len(ds)):
         try:
@@ -18,4 +18,4 @@ for key in failed:
 
 print(ds_len)
 print(len(failed['train']))
-torch.save(failed, "new_failed_train.pth")
+torch.save(failed, "CHAR_failed_train.pth")
