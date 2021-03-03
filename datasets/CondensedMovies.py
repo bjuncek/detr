@@ -171,7 +171,7 @@ class CondensedMoviesDetection(CMDBase):
                 [int(det[1]), int(det[2]), int(det[3]), int(det[4])]
             )  # [x1, y1, x2, y2]
             areas.append(det[3] * det[4])
-            labels.append(0)  # labels are 0 if face, 1 otherwise
+            labels.append(1)  # labels are 0 if face, 1 otherwise
             iscrowd.append(0)
             confidence.append(det[6])
 
