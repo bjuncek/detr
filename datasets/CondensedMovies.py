@@ -261,6 +261,7 @@ def build_character(image_set):
     failed = [
         "/users/korbar/phd/detr_working_copy/datasets/custom_data/failed.torchp",
         "/users/korbar/phd/detr_working_copy/datasets/custom_data/new_failed.torchp",
+        "/users/korbar/phd/detr_working_copy/datasets/custom_data/char_failed.torchp",
     ]
 
     return CondensedMoviesCharacter(

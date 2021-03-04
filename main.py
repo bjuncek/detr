@@ -257,7 +257,7 @@ def main(args):
                 for n, p in model_without_ddp.named_parameters()
                 if "backbone" in n and p.requires_grad
             ],
-            "lr": args.lr_backbone if not args.finetune else 0,
+            "lr": args.lr_backbone,
         },
     ]
     optimizer = torch.optim.AdamW(
