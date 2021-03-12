@@ -120,6 +120,7 @@ def evaluate(
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         outputs = model(samples, targets)
+
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
 
@@ -142,6 +143,7 @@ def evaluate(
 
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         results = postprocessors["bbox"](outputs, orig_target_sizes)
+
         if "segm" in postprocessors.keys():
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
             results = postprocessors["segm"](
@@ -151,6 +153,8 @@ def evaluate(
             target["image_id"].item(): output
             for target, output in zip(targets, results)
         }
+        print("TARGET thing", [target["image_id"].item() for target in targets])
+        break
         if coco_evaluator is not None:
             coco_evaluator.update(res)
 
@@ -192,3 +196,51 @@ def evaluate(
         stats["PQ_th"] = panoptic_res["Things"]
         stats["PQ_st"] = panoptic_res["Stuff"]
     return stats, coco_evaluator
+
+
+def test_wider(model, criterion, postprocessors, dset, data_loader, device, output_dir):
+    model.eval()
+    criterion.eval()
+
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    metric_logger.add_meter(
+        "class_error", utils.SmoothedValue(window_size=1, fmt="{value:.2f}")
+    )
+    header = "Test:"
+    for samples, targets in metric_logger.log_every(data_loader, 10, header):
+        samples = samples.to(device)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+        outputs = model(samples, targets)
+
+        classes = outputs["pred_logits"]
+        boxes = outputs["pred_boxes"]
+
+        loss_dict = criterion(outputs, targets)
+        weight_dict = criterion.weight_dict
+
+        # reduce losses over all GPUs for logging purposes
+        loss_dict_reduced = utils.reduce_dict(loss_dict)
+        loss_dict_reduced_scaled = {
+            k: v * weight_dict[k]
+            for k, v in loss_dict_reduced.items()
+            if k in weight_dict
+        }
+        loss_dict_reduced_unscaled = {
+            f"{k}_unscaled": v for k, v in loss_dict_reduced.items()
+        }
+        metric_logger.update(
+            loss=sum(loss_dict_reduced_scaled.values()),
+            **loss_dict_reduced_scaled,
+            **loss_dict_reduced_unscaled,
+        )
+        metric_logger.update(class_error=loss_dict_reduced["class_error"])
+        orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
+        results = postprocessors["bbox"](outputs, orig_target_sizes)
+        res = {
+            target["image_id"].item(): output
+            for target, output in zip(targets, results)
+        }
+
+        
+        print(dset.data[targets["image_id"].item()])
+        print("hello world")
