@@ -177,6 +177,7 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument("--dataset_file", default="coco")
+    parser.add_argument("--wider_mode", default="invalid")
     parser.add_argument(
         "--coco_path", type=str, default="/scratch/shared/beegfs/bkorbar/datasets/COCO"
     )

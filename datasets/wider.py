@@ -146,7 +146,15 @@ def make_default_transforms(image_set):
 
 def build(image_set, args):
 
+    assert args.wider_mode in [
+        "blur",
+        "expression",
+        "illumination",
+        "occlusion",
+        "pose",
+        "invalid",
+    ]
     root = "/work/korbar/WIDER"
     transforms = make_default_transforms(image_set)
 
-    return WIDER(root, split=image_set, transforms=transforms)
+    return WIDER(root, split=image_set, transforms=transforms, mode=args.wider_mode)
