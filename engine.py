@@ -153,8 +153,6 @@ def evaluate(
             target["image_id"].item(): output
             for target, output in zip(targets, results)
         }
-        print("TARGET thing", [target["image_id"].item() for target in targets])
-        break
         if coco_evaluator is not None:
             coco_evaluator.update(res)
 
@@ -241,6 +239,16 @@ def test_wider(model, criterion, postprocessors, dset, data_loader, device, outp
             for target, output in zip(targets, results)
         }
 
-        
-        print(dset.data[targets["image_id"].item()])
-        print("hello world")
+        # print([target["image_id"].item() for target in targets])
+        # print(
+        #     [
+        #         dset.data[i]["img_path"]
+        #         for i in [target["image_id"].item() for target in targets]
+        #     ]
+        # )
+        print("pre")
+        pred_tgt = res[[target["image_id"].item() for target in targets][0]]["labels"]
+        print(pred_tgt)
+        print(sum([i for i in pred_tgt if i == 1]))
+        print(targets[0]["labels"])
+        print("post")
