@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 import datasets
 import util.misc as utils
 from datasets import build_dataset, get_coco_api_from_dataset
-from engine import evaluate, train_one_epoch
+from engine import evaluate, train_one_epoch, test_wider
 from models import build_model
 
 
@@ -206,6 +206,7 @@ def get_args_parser():
         "--start_epoch", default=0, type=int, metavar="N", help="start epoch"
     )
     parser.add_argument("--eval", action="store_true")
+    parser.add_argument("--test", action="store_true")
     parser.add_argument("--num_workers", default=2, type=int)
 
     # distributed training parameters
@@ -354,6 +355,17 @@ def main(args):
             args.start_epoch = checkpoint["epoch"] + 1
 
     if args.eval:
+        if args.test and args.dataset_file == "wider":
+            test_wider(
+                model,
+                criterion,
+                postprocessors,
+                dataset_val,
+                data_loader_val,
+                device,
+                args.output_dir,
+            )
+            return
         test_stats, coco_evaluator = evaluate(
             model,
             criterion,
