@@ -380,7 +380,7 @@ def build(args):
     if args.dataset_file == "cmdc":
         num_classes = 6236
     if args.dataset_file == "wider":
-        if args.wider_mode in ["illumination", "pose", "invalid"]:
+        if args.wider_mode in ["illumination", "pose", "invalid", "expression"]:
             num_classes = 2
         if args.wider_mode in ["blur", "occlusion:"]:
             num_classes = 3
