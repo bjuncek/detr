@@ -1,6 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import argparse
 import datetime
+import os
 import json
 import random
 import time
@@ -356,6 +357,12 @@ def main(args):
 
     if args.eval:
         if args.test and args.dataset_file == "wider":
+            if args.resume:
+                s = args.resume.split("/")[:-1]
+                output_dir = "/" + os.path.join(*s)
+            else:
+                output_dir = args.output_dir
+            print("SAVING TEST WIDER TO ", output_dir)
             test_wider(
                 model,
                 criterion,
@@ -363,7 +370,7 @@ def main(args):
                 dataset_val,
                 data_loader_val,
                 device,
-                args.output_dir,
+                output_dir,
             )
             return
         test_stats, coco_evaluator = evaluate(
