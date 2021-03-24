@@ -5,6 +5,7 @@ Train and eval functions used in main.py
 import math
 import os
 import sys
+from pathlib import Path
 from typing import Iterable
 
 import torch
@@ -200,6 +201,9 @@ def test_wider(model, criterion, postprocessors, dset, data_loader, device, outp
     model.eval()
     criterion.eval()
 
+    output_dir = Path(output_dir) / "wider"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter(
         "class_error", utils.SmoothedValue(window_size=1, fmt="{value:.2f}")
@@ -209,9 +213,6 @@ def test_wider(model, criterion, postprocessors, dset, data_loader, device, outp
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         outputs = model(samples, targets)
-
-        classes = outputs["pred_logits"]
-        boxes = outputs["pred_boxes"]
 
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
@@ -239,16 +240,37 @@ def test_wider(model, criterion, postprocessors, dset, data_loader, device, outp
             for target, output in zip(targets, results)
         }
 
-        # print([target["image_id"].item() for target in targets])
-        # print(
-        #     [
-        #         dset.data[i]["img_path"]
-        #         for i in [target["image_id"].item() for target in targets]
-        #     ]
-        # )
-        print("pre")
-        pred_tgt = res[[target["image_id"].item() for target in targets][0]]["labels"]
-        print(pred_tgt)
-        print(sum([i for i in pred_tgt if i == 1]))
-        print(targets[0]["labels"])
-        print("post")
+        image_ids = [target["image_id"].item() for target in targets]
+        for i in range(len(image_ids)):
+            image_id = image_ids[i]
+            # print("FOLDER: ", dset.data[image_id]["img_path"].split("/")[0])
+            scene_folder = output_dir / dset.data[image_id]["img_path"].split("/")[0]
+            scene_folder.mkdir(parents=True, exist_ok=True)
+            file_name = (
+                dset.data[image_id]["img_path"].split("/")[1].replace("jpg", "txt")
+            )
+            # print("FILENAME: ", file_name)
+
+            labels = res[image_id]["labels"]
+            scores = res[image_id]["scores"]
+            bboxes = res[image_id]["boxes"]
+            num_faces = len(labels) - sum(labels).item()
+            # print("NUM FACES FOUND", num_faces)
+            # print("OUT LABELS ", len(labels), labels)
+
+            with open(scene_folder / file_name, "w") as f:
+                f.write(file_name.split(".")[0] + "\n")
+                f.write(str(num_faces) + "\n")
+                for j in range(len(labels)):
+                    if labels[j] == 0:
+                        bb = bboxes[j]
+                        sc = scores[j]
+                        d = "{0} {1} {2} {3} {4}\n".format(
+                            int(bb[0].item()),
+                            int(bb[1].item()),
+                            int(bb[2].item() - bb[0].item()),
+                            int(bb[3].item() - bb[1].item()),
+                            sc.item(),
+                        )
+                        f.write(d)
+
