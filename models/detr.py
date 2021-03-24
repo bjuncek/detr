@@ -207,6 +207,29 @@ class SetCriterion(nn.Module):
         losses["loss_giou"] = loss_giou.sum() / num_boxes
         return losses
 
+    def loss_embeddings(self, outputs, targets, indices, num_boxes):
+        """Compute the losses regarding the face embedding - namely the L2 loss. Target dicts must contain the key "embeddings" with
+        a tensor of dim [nb_target_boxes, 256]. The target embeddings are not expected to be L2 normalised.
+        """
+        assert "pred_embeddings" in outputs
+        idx = self._get_src_permutation_idx(indices)
+        src_embd = outputs["pred_embeddings"][idx]
+        target_embd = torch.cat(
+            [t["embeddings"][i] for t, (_, i) in zip(targets, indices)], dim=0
+        )
+
+        n_src_embd = torch.norm(src_embd, keepdim=True)
+        n_tgt_embd = torch.norm(target_embd, keepdim=True)
+
+        print(src_embd.size(), n_src_embd.size())
+
+        loss_embd = F.mse_loss(n_src_embd, n_tgt_embd, reduction="none")
+
+        losses = {}
+        losses["loss_embedd"] = loss_embd
+
+        return losses
+
     def loss_masks(self, outputs, targets, indices, num_boxes):
         """Compute the losses related to the masks: the focal loss and the dice loss.
            targets dicts must contain the key "masks" containing a tensor of dim [nb_target_boxes, h, w]
@@ -262,7 +285,9 @@ class SetCriterion(nn.Module):
             "cardinality": self.loss_cardinality,
             "boxes": self.loss_boxes,
             "masks": self.loss_masks,
+            "embeddings": self.loss_embeddings,
         }
+
         assert loss in loss_map, f"do you really want to compute {loss} loss?"
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
 
@@ -428,8 +453,11 @@ def build(args):
         weight_dict.update(aux_weight_dict)
 
     losses = ["labels", "boxes", "cardinality"]
+    if args.embedding_loss:
+        losses.append("embedding")
     if args.masks:
         losses += ["masks"]
+
     criterion = SetCriterion(
         num_classes,
         matcher=matcher,
