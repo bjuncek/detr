@@ -5,6 +5,7 @@ Train and eval functions used in main.py
 import math
 import os
 import sys
+from pathlib import Path
 from typing import Iterable
 
 import torch
@@ -120,6 +121,7 @@ def evaluate(
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         outputs = model(samples, targets)
+
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
 
@@ -142,6 +144,7 @@ def evaluate(
 
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         results = postprocessors["bbox"](outputs, orig_target_sizes)
+
         if "segm" in postprocessors.keys():
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
             results = postprocessors["segm"](
@@ -192,3 +195,82 @@ def evaluate(
         stats["PQ_th"] = panoptic_res["Things"]
         stats["PQ_st"] = panoptic_res["Stuff"]
     return stats, coco_evaluator
+
+
+def test_wider(model, criterion, postprocessors, dset, data_loader, device, output_dir):
+    model.eval()
+    criterion.eval()
+
+    output_dir = Path(output_dir) / "wider"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    metric_logger.add_meter(
+        "class_error", utils.SmoothedValue(window_size=1, fmt="{value:.2f}")
+    )
+    header = "Test:"
+    for samples, targets in metric_logger.log_every(data_loader, 10, header):
+        samples = samples.to(device)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+        outputs = model(samples, targets)
+
+        loss_dict = criterion(outputs, targets)
+        weight_dict = criterion.weight_dict
+
+        # reduce losses over all GPUs for logging purposes
+        loss_dict_reduced = utils.reduce_dict(loss_dict)
+        loss_dict_reduced_scaled = {
+            k: v * weight_dict[k]
+            for k, v in loss_dict_reduced.items()
+            if k in weight_dict
+        }
+        loss_dict_reduced_unscaled = {
+            f"{k}_unscaled": v for k, v in loss_dict_reduced.items()
+        }
+        metric_logger.update(
+            loss=sum(loss_dict_reduced_scaled.values()),
+            **loss_dict_reduced_scaled,
+            **loss_dict_reduced_unscaled,
+        )
+        metric_logger.update(class_error=loss_dict_reduced["class_error"])
+        orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
+        results = postprocessors["bbox"](outputs, orig_target_sizes)
+        res = {
+            target["image_id"].item(): output
+            for target, output in zip(targets, results)
+        }
+
+        image_ids = [target["image_id"].item() for target in targets]
+        for i in range(len(image_ids)):
+            image_id = image_ids[i]
+            # print("FOLDER: ", dset.data[image_id]["img_path"].split("/")[0])
+            scene_folder = output_dir / dset.data[image_id]["img_path"].split("/")[0]
+            scene_folder.mkdir(parents=True, exist_ok=True)
+            file_name = (
+                dset.data[image_id]["img_path"].split("/")[1].replace("jpg", "txt")
+            )
+            # print("FILENAME: ", file_name)
+
+            labels = res[image_id]["labels"]
+            scores = res[image_id]["scores"]
+            bboxes = res[image_id]["boxes"]
+            num_faces = len(labels) - sum(labels).item()
+            # print("NUM FACES FOUND", num_faces)
+            # print("OUT LABELS ", len(labels), labels)
+
+            with open(scene_folder / file_name, "w") as f:
+                f.write(file_name.split(".")[0] + "\n")
+                f.write(str(num_faces) + "\n")
+                for j in range(len(labels)):
+                    if labels[j] == 0:
+                        bb = bboxes[j]
+                        sc = scores[j]
+                        d = "{0} {1} {2} {3} {4}\n".format(
+                            int(bb[0].item()),
+                            int(bb[1].item()),
+                            int(bb[2].item() - bb[0].item()),
+                            int(bb[3].item() - bb[1].item()),
+                            sc.item(),
+                        )
+                        f.write(d)
+
