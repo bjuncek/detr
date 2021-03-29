@@ -53,7 +53,7 @@ class CondensedMoviesCharacter(CMDBase):
             if len(frame_id) != 0:
                 idxs.append((i, frame_id[0]))
 
-        boxes, labels, areas, iscrowd, confidence = ([], [], [], [], [])
+        boxes, labels, areas, iscrowd, confidence, facetracks = ([], [], [], [], [], [])
         # LOOP OVER THE DETECTIONS AND ADD THEM TO THE TARGET
         for det in idxs:
             track_id, frame_id = det
@@ -63,6 +63,7 @@ class CondensedMoviesCharacter(CMDBase):
             areas.append(xyhw[2] * xyhw[3])
             iscrowd.append(0)
             confidence.append(df["class_confidence"][track_id])
+            facetracks.append(df["facetrack_feature"][track_id])
 
         w, h = imgsize
         boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
@@ -75,6 +76,7 @@ class CondensedMoviesCharacter(CMDBase):
         iscrowd = torch.tensor(iscrowd)
         image_id = torch.tensor([frame_num])
         clips_id = torch.tensor([idx])
+        embeddings = torch.tensor(facetracks)
 
         return {
             "boxes": boxes,
@@ -85,6 +87,7 @@ class CondensedMoviesCharacter(CMDBase):
             "class_confidence": confidence,
             "image_id": image_id,
             "clips_idx": clips_id,
+            "embeddings": embeddings,
         }
 
 

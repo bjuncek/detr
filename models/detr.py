@@ -42,6 +42,7 @@ class DETR(nn.Module):
         num_classes,
         num_queries,
         aux_loss=False,
+        embedding_loss=False,
     ):
         """ Initializes the model.
         Parameters:
@@ -58,6 +59,9 @@ class DETR(nn.Module):
         hidden_dim = transformer.d_model
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
+        self.embedding_loss = embedding_loss
+        if embedding_loss:
+            self.face_embed = MLP(hidden_dim, hidden_dim, 256, 3)
         # self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.query_embed = query_encoder
         self.pool_module = pool_module
@@ -94,9 +98,13 @@ class DETR(nn.Module):
         hs = self.transformer(src, mask, self.query_embed(targets), pos)[0]
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
+
         out = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord[-1]}
         if self.aux_loss:
             out["aux_outputs"] = self._set_aux_loss(outputs_class, outputs_coord)
+        if self.embedding_loss:
+            out["pred_embeddings"] = self.face_embed(hs)
+
         return out
 
     @torch.jit.unused
@@ -211,6 +219,8 @@ class SetCriterion(nn.Module):
         """Compute the losses regarding the face embedding - namely the L2 loss. Target dicts must contain the key "embeddings" with
         a tensor of dim [nb_target_boxes, 256]. The target embeddings are not expected to be L2 normalised.
         """
+        print(outputs)
+        print(targets)
         assert "pred_embeddings" in outputs
         idx = self._get_src_permutation_idx(indices)
         src_embd = outputs["pred_embeddings"][idx]
@@ -436,6 +446,7 @@ def build(args):
         num_classes=num_classes,
         num_queries=args.num_queries,
         aux_loss=args.aux_loss,
+        embedding_loss=args.embedding_loss,
     )
     if args.masks:
         model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
@@ -454,7 +465,7 @@ def build(args):
 
     losses = ["labels", "boxes", "cardinality"]
     if args.embedding_loss:
-        losses.append("embedding")
+        losses.append("embeddings")
     if args.masks:
         losses += ["masks"]
 
