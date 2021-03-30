@@ -382,6 +382,8 @@ def build(args):
         num_classes = 1
     if args.dataset_file == "cmdc":
         num_classes = 6236
+    if args.dataset_file == "vggface2":
+        num_classes = 2588
     if args.dataset_file == "wider":
         if args.wider_mode == "invalid":
             num_classes = 1
