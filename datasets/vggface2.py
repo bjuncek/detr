@@ -24,7 +24,6 @@ class VGGFace2(DatasetFolder):
 
         return img, targets
 
-
     def _get_target(self, idx, path, c, imgsize):
         w, h = imgsize
 
