@@ -138,6 +138,13 @@ def get_args_parser():
         help="Train segmentation head if the flag is provided",
     )
 
+    # Aux loss stuff
+    parser.add_argument(
+        "--embedding_loss",
+        action="store_true",
+        help="Train segmentation head if the flag is provided",
+    )
+
     # Loss
     parser.add_argument(
         "--no_aux_loss",
