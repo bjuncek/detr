@@ -64,6 +64,7 @@ class CondensedMoviesCharacter(CMDBase):
             iscrowd.append(0)
             confidence.append(df["class_confidence"][track_id])
             facetracks.append(df["facetrack_feature"][track_id])
+            
 
         w, h = imgsize
         boxes = torch.as_tensor(boxes, dtype=torch.float32).reshape(-1, 4)
@@ -76,7 +77,7 @@ class CondensedMoviesCharacter(CMDBase):
         iscrowd = torch.tensor(iscrowd)
         image_id = torch.tensor([frame_num])
         clips_id = torch.tensor([idx])
-        embeddings = torch.tensor(facetracks)
+        embeddings = torch.tensor(facetracks).reshape(-1, 256)
 
         return {
             "boxes": boxes,

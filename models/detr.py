@@ -103,7 +103,7 @@ class DETR(nn.Module):
         if self.aux_loss:
             out["aux_outputs"] = self._set_aux_loss(outputs_class, outputs_coord)
         if self.embedding_loss:
-            out["pred_embeddings"] = self.face_embed(hs)
+            out["pred_embeddings"] = self.face_embed(hs)[-1]
 
         return out
 
@@ -219,21 +219,24 @@ class SetCriterion(nn.Module):
         """Compute the losses regarding the face embedding - namely the L2 loss. Target dicts must contain the key "embeddings" with
         a tensor of dim [nb_target_boxes, 256]. The target embeddings are not expected to be L2 normalised.
         """
-        print(outputs)
-        print(targets)
         assert "pred_embeddings" in outputs
         idx = self._get_src_permutation_idx(indices)
         src_embd = outputs["pred_embeddings"][idx]
+        
+
         target_embd = torch.cat(
             [t["embeddings"][i] for t, (_, i) in zip(targets, indices)], dim=0
-        )
+        )   
+        
 
-        n_src_embd = torch.norm(src_embd, keepdim=True)
-        n_tgt_embd = torch.norm(target_embd, keepdim=True)
+        src_embdn = torch.norm(src_embd, p=2, dim=1, keepdim=True).detach()
+        n_src_embd = src_embd.div(src_embdn.expand_as(src_embd))
 
-        print(src_embd.size(), n_src_embd.size())
+        tgt_embd_n = torch.norm(target_embd, p=2, dim=1, keepdim=True).detach()
+        n_tgt_embd = target_embd.div(tgt_embd_n.expand_as(src_embd))
 
-        loss_embd = F.mse_loss(n_src_embd, n_tgt_embd, reduction="none")
+
+        loss_embd = F.mse_loss(n_src_embd, n_tgt_embd)
 
         losses = {}
         losses["loss_embedd"] = loss_embd
@@ -331,7 +334,7 @@ class SetCriterion(nn.Module):
         if "aux_outputs" in outputs:
             for i, aux_outputs in enumerate(outputs["aux_outputs"]):
                 indices = self.matcher(aux_outputs, targets)
-                for loss in self.losses:
+                for loss in [l for l in self.losses if l != "embeddings"]:
                     if loss == "masks":
                         # Intermediate masks losses are too costly to compute, we ignore them.
                         continue
@@ -456,6 +459,8 @@ def build(args):
     if args.masks:
         weight_dict["loss_mask"] = args.mask_loss_coef
         weight_dict["loss_dice"] = args.dice_loss_coef
+    if args.embedding_loss:
+        weight_dict["loss_embedding"] = 1
     # TODO this is a hack
     if args.aux_loss:
         aux_weight_dict = {}
