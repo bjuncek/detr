@@ -230,13 +230,13 @@ class SetCriterion(nn.Module):
         
 
         src_embdn = torch.norm(src_embd, p=2, dim=1, keepdim=True).detach()
-        n_src_embd = src_embd.div(src_embdn.expand_as(src_embd))
+        src_embd = src_embd.div(src_embdn.expand_as(src_embd))
 
         tgt_embd_n = torch.norm(target_embd, p=2, dim=1, keepdim=True).detach()
-        n_tgt_embd = target_embd.div(tgt_embd_n.expand_as(src_embd))
+        target_embd = target_embd.div(tgt_embd_n.expand_as(src_embd))
 
 
-        loss_embd = F.mse_loss(n_src_embd, n_tgt_embd)
+        loss_embd = F.mse_loss(src_embd, target_embd)
 
         losses = {}
         losses["loss_embedd"] = loss_embd
