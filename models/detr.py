@@ -103,7 +103,12 @@ class DETR(nn.Module):
         if self.aux_loss:
             out["aux_outputs"] = self._set_aux_loss(outputs_class, outputs_coord)
         if self.embedding_loss:
-            out["pred_embeddings"] = self.face_embed(hs)[-1]
+            bla = self.face_embed(hs)
+            blaa = bla[-1]
+            blab = bla[:-1].detach()
+            del blab
+            out["pred_embeddings"] = blaa
+
 
         return out
 
@@ -226,20 +231,19 @@ class SetCriterion(nn.Module):
 
         target_embd = torch.cat(
             [t["embeddings"][i] for t, (_, i) in zip(targets, indices)], dim=0
-        )   
+        ).float()
         
-
         src_embdn = torch.norm(src_embd, p=2, dim=1, keepdim=True).detach()
         src_embd = src_embd.div(src_embdn.expand_as(src_embd))
+
 
         tgt_embd_n = torch.norm(target_embd, p=2, dim=1, keepdim=True).detach()
         target_embd = target_embd.div(tgt_embd_n.expand_as(src_embd))
 
-
-        loss_embd = F.mse_loss(src_embd, target_embd)
+        loss_embd = F.mse_loss(src_embd, target_embd, reduction='sum')  / num_boxes
 
         losses = {}
-        losses["loss_embedd"] = loss_embd
+        losses["loss_embedding"] = loss_embd
 
         return losses
 
@@ -335,7 +339,7 @@ class SetCriterion(nn.Module):
             for i, aux_outputs in enumerate(outputs["aux_outputs"]):
                 indices = self.matcher(aux_outputs, targets)
                 for loss in [l for l in self.losses if l != "embeddings"]:
-                    if loss == "masks":
+                    if loss == "masks" or loss == "embeddings":
                         # Intermediate masks losses are too costly to compute, we ignore them.
                         continue
                     kwargs = {}
