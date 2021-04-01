@@ -466,7 +466,7 @@ def build(args):
         weight_dict["loss_mask"] = args.mask_loss_coef
         weight_dict["loss_dice"] = args.dice_loss_coef
     if args.embedding_loss:
-        weight_dict["loss_embedding"] = 1
+        weight_dict["loss_embedding"] = args.embd_loss_coef
     # TODO this is a hack
     if args.aux_loss:
         aux_weight_dict = {}
