@@ -42,8 +42,7 @@ def train_one_epoch(
 
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
-        print(loss_dict.keys())
-        print(weight_dict.keys())
+
         losses = sum(
             loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict
         )
