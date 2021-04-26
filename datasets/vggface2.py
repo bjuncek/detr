@@ -8,11 +8,18 @@ import datasets.transforms as T
 
 
 class VGGFace2(DatasetFolder):
-    def __init__(self, root, annotation_path, transforms=None, split="train"):
+    def __init__(self, root, annotation_path, transforms=None, split="train", datapath=None):
+        if split == "val":
+            split = "train"
         root = os.path.join(root, split)
         self._transform = transforms
         self.annotations = pd.read_csv(annotation_path)
         super(VGGFace2, self).__init__(root, loader=pil_loader, extensions=('.jpg', '.jpeg'))
+
+        if datapath is not None:
+            self.samples = torch.load(datapath)
+        
+        print("Loaded vggface2", self.__len__())
 
     def __getitem__(self, index):
         p, c = self.samples[index]
@@ -75,19 +82,22 @@ def make_default_transforms(image_set):
             ]
         )
 
-    if image_set == "test":
+    if image_set in ["test", "val"]:
         return T.Compose([T.RandomResize([800], max_size=1333), normalize,])
 
     raise ValueError(f"unknown {image_set}")
 
 
-def build(image_set, args):
+def build(image_set):
 
+    ann_set = image_set
     if image_set == "val":
-        image_set = "test"
+        ann_set = "train"
+    
+    datapath = f"/users/korbar/phd/detr_working_copy/datasets/custom_data/vggface2_{image_set}.pth" if image_set in ["train", "val"] else None
 
     root = "/work/korbar/VGGFACE2_raw"
-    annotations = f"/work/korbar/VGGFACE2_raw/bb_landmark/loose_bb_{image_set}.csv"
+    annotations = f"/work/korbar/VGGFACE2_raw/bb_landmark/loose_bb_{ann_set}.csv"
     transforms = make_default_transforms(image_set)
 
-    return VGGFace2(root, annotation_path=annotations, split=image_set, transforms=transforms)
+    return VGGFace2(root, annotation_path=annotations, split=image_set, transforms=transforms, datapath=datapath )

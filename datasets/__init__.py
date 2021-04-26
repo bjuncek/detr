@@ -29,7 +29,7 @@ def build_dataset(image_set, args):
     if args.dataset_file == "wider":
         return build(image_set, args)
     if args.dataset_file == "vggface2":
-        return buildvgg(image_set, args)
+        return buildvgg(image_set)
     if args.dataset_file == "coco_panoptic":
         # to avoid making panopticapi required for coco
         from .coco_panoptic import build as build_coco_panoptic
