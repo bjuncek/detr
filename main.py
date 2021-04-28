@@ -187,6 +187,9 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument("--dataset_file", default="coco")
+    parser.add_argument(
+        "--crop", action="store_true", default=False,
+    )
     parser.add_argument("--wider_mode", default="invalid")
     parser.add_argument(
         "--coco_path", type=str, default="/scratch/shared/beegfs/bkorbar/datasets/COCO"
@@ -390,7 +393,9 @@ def main(args):
             base_ds,
             device,
             args.output_dir,
-            coco=False if args.dataset_file in ["cmdd", "cmdc", "wider", "vggface2"] else True,
+            coco=False
+            if args.dataset_file in ["cmdd", "cmdc", "wider", "vggface2"]
+            else True,
         )
         if args.output_dir and coco_evaluator is not None:
             utils.save_on_master(
@@ -438,7 +443,9 @@ def main(args):
             base_ds,
             device,
             args.output_dir,
-            coco=False if args.dataset_file in ["cmdd", "cmdc", "wider", "vggface2"] else True,
+            coco=False
+            if args.dataset_file in ["cmdd", "cmdc", "wider", "vggface2"]
+            else True,
         )
 
         log_stats = {
