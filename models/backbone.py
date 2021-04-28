@@ -14,6 +14,7 @@ from typing import Dict, List
 from util.misc import NestedTensor, is_main_process
 
 from .position_encoding import build_position_encoding
+from .se_net import senet50_256
 
 
 class FrozenBatchNorm2d(torch.nn.Module):
@@ -76,6 +77,7 @@ class BackboneBase(nn.Module):
         train_backbone: bool,
         num_channels: int,
         return_interm_layers: bool,
+        opt_name=None,
     ):
         super().__init__()
         for name, parameter in backbone.named_parameters():
@@ -89,9 +91,13 @@ class BackboneBase(nn.Module):
         if return_interm_layers:
             return_layers = {"layer1": "0", "layer2": "1", "layer3": "2", "layer4": "3"}
         else:
-            return_layers = {"layer4": "0"}
-            # return_layers = {"avgpool": "0"}
-        self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)
+            if opt_name is None:
+                return_layers = {"layer4": "0"}
+            else:
+                return_layers = None
+                self.body = backbone
+        if return_layers is not None:
+            self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)
         self.num_channels = num_channels
 
     def forward(self, tensor_list: NestedTensor):
@@ -115,13 +121,22 @@ class Backbone(BackboneBase):
         return_interm_layers: bool,
         dilation: bool,
     ):
-        backbone = getattr(torchvision.models, name)(
-            replace_stride_with_dilation=[False, False, dilation],
-            pretrained=is_main_process(),
-            norm_layer=FrozenBatchNorm2d,
+        if name not in ["senet256"]:
+            optname = None
+            backbone = getattr(torchvision.models, name)(
+                replace_stride_with_dilation=[False, False, dilation],
+                pretrained=is_main_process(),
+                norm_layer=FrozenBatchNorm2d,
+            )
+            num_channels = 512 if name in ("resnet18", "resnet34") else 2048
+        else:
+            optname = "feat_extract"
+            backbone = senet50_256(pretrained=is_main_process())
+            num_channels = 2048
+
+        super().__init__(
+            backbone, train_backbone, num_channels, return_interm_layers, optname
         )
-        num_channels = 512 if name in ("resnet18", "resnet34") else 2048
-        super().__init__(backbone, train_backbone, num_channels, return_interm_layers)
 
 
 class Joiner(nn.Sequential):
