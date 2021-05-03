@@ -250,7 +250,6 @@ def main(args):
 
     model, criterion, postprocessors = build_model(args)
     model.to(device)
-
     model_without_ddp = model
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
@@ -302,7 +301,7 @@ def main(args):
     )
     data_loader_val = DataLoader(
         dataset_val,
-        args.batch_size,
+        args.batch_size if args.batch_size < 4 else 4,
         sampler=sampler_val,
         drop_last=False,
         collate_fn=utils.collate_fn,
