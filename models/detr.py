@@ -69,7 +69,7 @@ class DETR(nn.Module):
         self.backbone = backbone
         self.aux_loss = aux_loss
 
-    def forward(self, samples: NestedTensor, targets):
+    def forward(self, samples: NestedTensor, targets=None):
         """ The forward expects a NestedTensor, which consists of:
                - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
                - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
@@ -426,6 +426,8 @@ def build(args):
         num_classes = 6236
     if args.dataset_file == "vggface2":
         num_classes = 8631
+    if args.dataset_file =="MOT17":
+        num_classes = 1
     if args.dataset_file == "wider":
         if args.wider_mode == "invalid":
             num_classes = 1
