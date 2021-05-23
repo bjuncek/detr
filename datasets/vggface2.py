@@ -122,8 +122,8 @@ def build(image_set, crop=False):
         else None
     )
 
-    root = "/work/korbar/VGGFACE2_raw"
-    annotations = f"/work/korbar/VGGFACE2_raw/bb_landmark/loose_bb_{ann_set}.csv"
+    root = "/work/korbar/datasets/VGGFACE2_raw"
+    annotations = f"/work/korbar/datasets/VGGFACE2_raw/bb_landmark/loose_bb_{ann_set}.csv"
     transforms = make_default_transforms(image_set, crop)
 
     return VGGFace2(
