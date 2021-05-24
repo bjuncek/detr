@@ -58,9 +58,10 @@ class MOTObjDetect(torch.utils.data.Dataset):
     def num_classes(self):
         return len(self._classes)
 
-    def _get_annotation(self, idx):
+    def _get_annotation(self, idx, imgsize):
         """
         """
+        w, h = imgsize
 
         if 'test' in self.root:
             num_objs = 0
@@ -71,6 +72,7 @@ class MOTObjDetect(torch.utils.data.Dataset):
                 'image_id': torch.tensor([idx]),
                 'area': (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0]),
                 'iscrowd': torch.zeros((num_objs,), dtype=torch.int64),
+                "orig_size": torch.as_tensor([int(h), int(w)]),
                 'visibilities': torch.zeros((num_objs), dtype=torch.float32)}
 
         img_path = self._img_paths[idx]
@@ -120,6 +122,7 @@ class MOTObjDetect(torch.utils.data.Dataset):
         return {'boxes': boxes,
                 'labels': torch.ones((num_objs,), dtype=torch.int64),
                 'image_id': torch.tensor([idx]),
+                "orig_size": torch.as_tensor([int(h), int(w)]),
                 'area': (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0]),
                 'iscrowd': torch.zeros((num_objs,), dtype=torch.int64),
                 'visibilities': visibilities,}
@@ -130,7 +133,7 @@ class MOTObjDetect(torch.utils.data.Dataset):
         # mask_path = os.path.join(self.root, "PedMasks", self.masks[idx])
         img = Image.open(img_path).convert("RGB")
 
-        target = self._get_annotation(idx)
+        target = self._get_annotation(idx, img.size)
 
         if self.transforms is not None:
             img, target = self.transforms(img, target)

@@ -312,7 +312,7 @@ def main(args):
         # We also evaluate AP during panoptic training, on original coco DS
         coco_val = datasets.coco.build("val", args)
         base_ds = get_coco_api_from_dataset(coco_val)
-    elif args.dataset_file in ["cmdd", "cmdc", "wider"]:
+    elif args.dataset_file in ["cmdd", "cmdc", "wider", "MOT17", "VGGFace2"]:
         base_ds = None
     else:
         base_ds = get_coco_api_from_dataset(dataset_val)
@@ -392,9 +392,9 @@ def main(args):
             base_ds,
             device,
             args.output_dir,
-            coco=False
-            if args.dataset_file in ["cmdd", "cmdc", "wider", "vggface2"]
-            else True,
+            coco=True
+            if args.dataset_file in ["coco"]
+            else False,
         )
         if args.output_dir and coco_evaluator is not None:
             utils.save_on_master(
