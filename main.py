@@ -188,6 +188,9 @@ def get_args_parser():
     # dataset parameters
     parser.add_argument("--dataset_file", default="coco")
     parser.add_argument(
+        "--add_class", default=False, action="store_true",
+    )
+    parser.add_argument(
         "--crop", action="store_true", default=False,
     )
     parser.add_argument("--wider_mode", default="invalid")
@@ -314,6 +317,8 @@ def main(args):
         base_ds = get_coco_api_from_dataset(coco_val)
     elif args.dataset_file in ["cmdd", "cmdc", "wider"]:
         base_ds = None
+    elif args.dataset_file == "MOT17":
+        base_ds = dataset_val
     else:
         base_ds = get_coco_api_from_dataset(dataset_val)
 
@@ -392,9 +397,7 @@ def main(args):
             base_ds,
             device,
             args.output_dir,
-            coco=True
-            if args.dataset_file in ["coco"]
-            else False,
+            dset_file=args.dataset_file,
         )
         if args.output_dir and coco_evaluator is not None:
             utils.save_on_master(
@@ -442,9 +445,7 @@ def main(args):
             base_ds,
             device,
             args.output_dir,
-            coco=True
-            if args.dataset_file in ["coco"]
-            else False,
+            dset_file=args.dataset_file,
         )
 
         log_stats = {

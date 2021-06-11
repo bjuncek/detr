@@ -87,7 +87,6 @@ class DETR(nn.Module):
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
         features, pos = self.backbone(samples, targets)
-
         src, mask = features[-1].decompose()
         src = self.input_proj(src)
         assert mask is not None
@@ -98,6 +97,7 @@ class DETR(nn.Module):
         hs = self.transformer(src, mask, self.query_embed(targets), pos)[0]
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
+        del targets
 
         out = {"pred_logits": outputs_class[-1], "pred_boxes": outputs_coord[-1]}
         if self.aux_loss:
@@ -439,6 +439,9 @@ def build(args):
         # for panoptic, we just add a num_classes that is large enough to hold
         # max_obj_id + 1, but the exact value doesn't really matter
         num_classes = 250
+    if args.add_class:
+        num_classes += 1
+
     device = torch.device(args.device)
 
     backbone = build_backbone(args)

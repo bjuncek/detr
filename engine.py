@@ -92,7 +92,7 @@ def evaluate(
     base_ds,
     device,
     output_dir,
-    coco=True,
+    dset_file="coco",
 ):
     model.eval()
     criterion.eval()
@@ -105,8 +105,11 @@ def evaluate(
 
     iou_types = tuple(k for k in ("segm", "bbox") if k in postprocessors.keys())
     coco_evaluator = None
-    if coco:
+    if dset_file == "coco":
         coco_evaluator = CocoEvaluator(base_ds, iou_types)
+    if dset_file == "MOT17":
+        mot_res = {}
+    print("DSET Eval", dset_file)
     # coco_evaluator.coco_eval[iou_types[0]].params.iouThrs = [0, 0.1, 0.5, 0.75]
 
     panoptic_evaluator = None
@@ -155,6 +158,8 @@ def evaluate(
             target["image_id"].item(): output
             for target, output in zip(targets, results)
         }
+        if dset_file == "MOT17":
+            mot_res.update({target["image_id"].item(): {'boxes': output["boxes"].cpu(), 'scores': output["scores"].cpu} for target, output in zip(targets, results)})
         if coco_evaluator is not None:
             coco_evaluator.update(res)
 
@@ -186,6 +191,10 @@ def evaluate(
     if panoptic_evaluator is not None:
         panoptic_res = panoptic_evaluator.summarize()
     stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    if dset_file == "MOT17":
+        print("\n \n ### FINAL MOT STATS: ### \n \t")
+        stats.update(base_ds.print_eval(mot_res))
+        print("\n\n")
     if coco_evaluator is not None:
         if "bbox" in postprocessors.keys():
             stats["coco_eval_bbox"] = coco_evaluator.coco_eval["bbox"].stats.tolist()
@@ -244,20 +253,16 @@ def test_wider(model, criterion, postprocessors, dset, data_loader, device, outp
         image_ids = [target["image_id"].item() for target in targets]
         for i in range(len(image_ids)):
             image_id = image_ids[i]
-            # print("FOLDER: ", dset.data[image_id]["img_path"].split("/")[0])
             scene_folder = output_dir / dset.data[image_id]["img_path"].split("/")[0]
             scene_folder.mkdir(parents=True, exist_ok=True)
             file_name = (
                 dset.data[image_id]["img_path"].split("/")[1].replace("jpg", "txt")
             )
-            # print("FILENAME: ", file_name)
 
             labels = res[image_id]["labels"]
             scores = res[image_id]["scores"]
             bboxes = res[image_id]["boxes"]
             num_faces = len(labels) - sum(labels).item()
-            # print("NUM FACES FOUND", num_faces)
-            # print("OUT LABELS ", len(labels), labels)
 
             with open(scene_folder / file_name, "w") as f:
                 f.write(file_name.split(".")[0] + "\n")
