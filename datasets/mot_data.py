@@ -58,10 +58,12 @@ class MOTObjDetect(torch.utils.data.Dataset):
     def num_classes(self):
         return len(self._classes)
 
-    def _get_annotation(self, idx, imgsize):
+    def _get_annotation(self, idx, imgsize=None):
         """
         """
-        w, h = imgsize
+        w, h = 0, 0
+        if imgsize is not None:
+            w, h = imgsize
 
         if 'test' in self.root:
             num_objs = 0
@@ -327,15 +329,35 @@ class MOTObjDetect(torch.utils.data.Dataset):
         return {'AP': ap, 'precision': prec, 'recall': rec, 'TP': tp, 'FP': fp}
 
 
-def get_transform(train):
-    transforms = []
-    if train:
-        # during training, randomly flip the training images
-        # and ground-truth for data augmentation
-        transforms.append(T.RandomHorizontalFlip(0.5))
-    # converts the image, a PIL image, into a PyTorch Tensor
-    transforms.append(T.ToTensor())
-    return T.Compose(transforms)
+def get_transform(image_set):
+    normalize = T.Compose(
+        [T.ToTensor(), T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]
+    )
+
+    scales = [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
+
+    if image_set == "train":
+        return T.Compose(
+            [
+                T.RandomHorizontalFlip(),
+                T.RandomSelect(
+                    T.RandomResize(scales, max_size=1333),
+                    T.Compose(
+                        [
+                            T.RandomResize([400, 500, 600]),
+                            T.RandomSizeCrop(384, 600),
+                            T.RandomResize(scales, max_size=1333),
+                        ]
+                    ),
+                ),
+                normalize,
+            ]
+        )
+
+    if image_set == "val":
+        return T.Compose([T.RandomResize([800], max_size=1333), normalize,])
+
+    raise ValueError(f"unknown {image_set}")
 
 
 def build_MOT(image_set):
@@ -350,12 +372,17 @@ def build_MOT(image_set):
     if image_set == "train":
         dataset = MOTObjDetect(
             osp.join(data_root_dir, 'train'),
-            get_transform(train=True),
+            get_transform(image_set),
             split_seqs=train_split_seqs)   
-    else:
+    elif image_set not in ["train", "test"]:
         dataset = MOTObjDetect(
             osp.join(data_root_dir, 'train'),
-            get_transform(train=False),
+            get_transform(image_set),
             split_seqs=val_split_seqs) 
+    elif image_set == "test":
+        dataset = MOTObjDetect(
+            osp.join(data_root_dir, 'test'),
+            get_transform("val"),
+        )
 
     return dataset  
